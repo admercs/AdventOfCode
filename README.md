@@ -1,1 +1,5 @@
 # AdventOfCode
+
+## License
+
+MIT License
