@@ -51,7 +51,7 @@ type Args = CliArgs;
 static WORDS: [&str; 10] = [
     "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
 ];
-static DIGITS: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+static DIGITS: [u8; 10] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
 
 ///
 /// Functions
@@ -231,10 +231,11 @@ fn line_sum_array(line: String, verbose: bool) -> u32 {
     // loop over the byte array and collect digits of radix 10 (ASCII numbers)
     n = line_bytes.len();
     let mut j: usize = 0;
+    let mut k: usize;
     while j < n {
         // check if j is start of digit word
-        // if true, convert to byte and return the updated index j
-        words_to_digits_array(&mut line_bytes, &mut j, true);
+        // if true, convert first position to digit byte and update index j
+        words_to_digits_array(&mut line_bytes, &mut j, verbose);
         //if verbose { println!("j: {}", j); }
         c = u8_to_char(line_bytes[j]);
         //if verbose { println!("c: {}", c); }
@@ -243,7 +244,12 @@ fn line_sum_array(line: String, verbose: bool) -> u32 {
             if verbose {
                 println!("{}: {}", "left", c);
             }
-            for k in (j..n).rev() {
+            //for k in (j..n).rev() {
+            k = n - 1;
+            while k >= j {
+                // check if k is start of digit word
+                // if true, convert first position to digit byte and update index j
+                words_to_digits_array(&mut line_bytes, &mut k, verbose);
                 //println!("k: {}", k);
                 c = u8_to_char(line_bytes[k]);
                 //println!("c: {}", c);
@@ -258,6 +264,7 @@ fn line_sum_array(line: String, verbose: bool) -> u32 {
                     }
                     return sum;
                 }
+                k -= 1;
             }
         }
         j += 1;
@@ -340,7 +347,7 @@ fn line_sum_fn(f: impl Fn(String, bool) -> u32) -> impl Fn(String, bool) -> u32 
 #[allow(dead_code)]
 fn line_sum_fn_str(name: &str) -> impl Fn(String, bool) -> u32 {
     let f: fn(String, bool) -> u32 = match name {
-        "array" => line_sum_iterator,
+        "array" => line_sum_array,
         "iterator" => line_sum_iterator,
         _ => unimplemented!(),
     };
@@ -352,23 +359,42 @@ fn line_sum_fn_str(name: &str) -> impl Fn(String, bool) -> u32 {
  * If char byte is start of digit string bytes, convert to decimal char and increment index by string length.
  */
 #[allow(dead_code)]
-fn words_to_digits_array(line_bytes: &mut [u8], index: &mut usize, verbose: bool) -> () {
+fn words_to_digits_array(line_bytes: &mut Vec<u8>, index: &mut usize, verbose: bool) -> () {
     // variables
     let mut word_bytes: &[u8]; // word byte array
     let mut word_len: usize; // word length
     let mut substring: &[u8]; // subarray from index to word end
     let mut i: usize = 0;
+    let mut end: usize;
     // loop over each key-value pair and replace words with digits. WORDS and DIGITS are equal length.
     for word in WORDS {
         word_bytes = word.as_bytes();
         word_len = word_bytes.len();
-        substring = &line_bytes[*index..=word_len]; // slice from the starting index to n-char
+        end = *index + word_len;
+        // bounds check
+        if end > line_bytes.len() - 1 {
+            continue;
+        }
+        substring = &line_bytes[*index..end]; // slice from the starting index to n-char
+                                              /*
+                                              if verbose {
+                                                  println!(
+                                                      "string: {}, index: {}, end: {}, length: {}, substring: {}, word: {}",
+                                                      std::str::from_utf8(&line_bytes).unwrap(),
+                                                      index,
+                                                      end,
+                                                      word_len,
+                                                      std::str::from_utf8(&substring).unwrap(),
+                                                      word
+                                                  );
+                                              }
+                                              */
         if substring == word_bytes {
-            if verbose {
-                println!("match: {}", std::str::from_utf8(&substring).unwrap());
-            }
             line_bytes[*index] = DIGITS[i];
-            *index += word_len - 1;
+            if verbose {
+                println!("updated: {}", std::str::from_utf8(&line_bytes).unwrap());
+            }
+            *index += word_len;
         }
         i += 1;
     }
@@ -446,7 +472,7 @@ Examples:
 fn parse_args() -> Args {
     // defaults for variables that we store in CliArgs
     let mut input: PathBuf = Path::new("..").join("input.txt");
-    let mut method: String = String::from("iterator");
+    let mut method: String = String::from("array");
     let mut verbose: bool = false;
     // loop over CLI arguments
     let mut cli_args: std::iter::Skip<env::Args> = env::args().skip(1);
@@ -522,7 +548,7 @@ fn main() -> Result<(), &'static str> {
         i += 1;
         if args.verbose {
             println!(
-                "i: {}",
+                "#: {}",
                 colorize(i.to_string().as_str(), "green", true, false)
             );
         }
