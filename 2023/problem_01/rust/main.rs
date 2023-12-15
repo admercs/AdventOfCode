@@ -378,17 +378,17 @@ fn words_to_digits_array(line_bytes: &mut Vec<u8>, index: usize, verbose: bool) 
             continue;
         }
         substring = &line_bytes[index..=end]; // slice from the starting index to n-char
-        if verbose {
-            println!(
-                "string: {}, index: {}, end: {}, length: {}, substring: {}, word: {}",
-                std::str::from_utf8(&line_bytes).unwrap(),
-                index,
-                end,
-                word_len,
-                std::str::from_utf8(&substring).unwrap(),
-                word
-            );
-        }
+                                              //if verbose {
+                                              //    println!(
+                                              //        "string: {}, index: {}, end: {}, length: {}, substring: {}, word: {}",
+                                              //        std::str::from_utf8(&line_bytes).unwrap(),
+                                              //        index,
+                                              //        end,
+                                              //        word_len,
+                                              //        std::str::from_utf8(&substring).unwrap(),
+                                              //        word
+                                              //    );
+                                              //}
         if substring == word_bytes {
             line_bytes[index] = DIGITS[i];
             if verbose {
@@ -486,7 +486,33 @@ Examples:
   $ /.main.exe --input .\data\input.txt --sum array --replace array
   $ /.main.exe --help
     "#;
-    println!("{}", colorize(HELP, "red", false, false));
+    println!("{}", colorize(HELP, "cyan", false, false));
+}
+
+fn banner() {
+    const BANNER: &'static str = r#"
+    Advent of Code 2023
+    December 01: Trebuchet!
+                             .`.
+                            / `.`.
+     ______________________/____`_`____________________________
+    / .''.  _        _           _          _           __..--->.
+    \ '()'       _       .''.        _       ____...---'       .'
+     |_||______.`.__  .' .'______......-----'                 /
+      .||-||-./ `.`.' .'   \/_/  `./   /`.`.                .'
+    .'_||__.'/ (O)`.`.    \/_/     `./   /`.`.             /
+    |_ -  _|/\     /`.`. \/_/        `./   /`.`.          /
+    | - _  /\   ./   /`.`. /___________`./   /`.`._     .'
+    '-----/\  \/ `./   /`.`._____________`._____` .|   /
+         /\  \/_/  `./   /`.`.________________.'.'.' .'
+        /\  \/_/   .-`./   /`.`.---------.''.-----.-'
+       /\  \/_/  .'~ _ `./   /`.`. _ ~   '..'`._.'
+    .'/\  \/_/  '--------`./   /`.`.-----------' 
+  .' /\  \/ /______________`./   /`.`..'.'.'
+.'__/____/___________________`._____` .'.'
+|____________________________________|.'
+    "#;
+    println!("{}", colorize(BANNER, "green", false, false));
 }
 
 /*
@@ -521,10 +547,12 @@ fn parse_args() -> Args {
                 verbose = true;
             }
             "-p" | "--problem" => {
+                banner();
                 problem();
                 std::process::exit(0);
             }
             "-h" | "--help" => {
+                banner();
                 help();
                 std::process::exit(0);
             }
@@ -580,6 +608,7 @@ fn main() -> Result<(), &'static str> {
 
     // open `input.txt` file reader buffer
     if args.verbose {
+        banner();
         println!("Opening file from path: {}", &args.input.display());
     }
     let file = File::open(&args.input).expect("Failed to open file.");
@@ -592,7 +621,7 @@ fn main() -> Result<(), &'static str> {
         if args.verbose {
             println!(
                 "#: {}",
-                colorize(i.to_string().as_str(), "green", true, false)
+                colorize(i.to_string().as_str(), "cyan", true, false)
             );
         }
         line_sum = line_sum_fn_str(&args.method_sum);
