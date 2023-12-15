@@ -578,6 +578,7 @@ fn parse_args() -> Args {
 ///
 
 fn main() -> Result<(), &'static str> {
+    banner();
     // validate variable definitions
     assert!(WORDS.len() == DIGITS.len());
 
@@ -608,7 +609,6 @@ fn main() -> Result<(), &'static str> {
 
     // open `input.txt` file reader buffer
     if args.verbose {
-        banner();
         println!("Opening file from path: {}", &args.input.display());
     }
     let file = File::open(&args.input).expect("Failed to open file.");
