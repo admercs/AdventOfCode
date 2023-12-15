@@ -512,7 +512,7 @@ fn banner() {
 .'__/____/___________________`._____` .'.'
 |____________________________________|.'
     "#;
-    println!("{}", colorize(BANNER, "green", false, false));
+    println!("{}", colorize(BANNER, "cyan", false, false));
 }
 
 /*
@@ -547,12 +547,10 @@ fn parse_args() -> Args {
                 verbose = true;
             }
             "-p" | "--problem" => {
-                banner();
                 problem();
                 std::process::exit(0);
             }
             "-h" | "--help" => {
-                banner();
                 help();
                 std::process::exit(0);
             }
