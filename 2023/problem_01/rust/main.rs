@@ -27,7 +27,9 @@ use std::path::{Path, PathBuf};
  *
  * Aho-Corasick algorithm for time- and space-optimal string replacement.
  * Time complexity: O(n + m + z) where:
- *   n = string length, m = number of characters in all words, z = number of word occurrences
+ *   n = string length
+ *   m = number of characters in all words
+ *   z = number of word occurrences
  * Intuitively, the algorithm works by constructing a fully connected trie of all search words
  * before walking the trie for each character in the string.
  */
@@ -40,7 +42,8 @@ use aho_corasick::AhoCorasick;
 /* CLI arguments */
 struct CliArgs {
     input: PathBuf,
-    method: String,
+    method_sum: String,
+    method_replace: String,
     verbose: bool,
 }
 type Args = CliArgs;
@@ -51,7 +54,7 @@ type Args = CliArgs;
 static WORDS: [&str; 10] = [
     "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
 ];
-static DIGITS: [u8; 10] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
+static DIGITS: [u8; 10] = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57]; // ASCII/UTF-8 byte encoding
 
 ///
 /// Functions
@@ -213,10 +216,11 @@ where
 /*
  * Loop over line string (char array) and return the sum of outermost digits.
  * We do not use mutability on left or right, but the compiler complains anyway.
+ * Convert string to bytes and loop over indices (the C way) not iterators (the Rust way).
  */
 #[allow(unused_mut)]
 #[allow(dead_code)]
-fn line_sum_array(line: String, verbose: bool) -> u32 {
+fn line_sum_array(line: String, replace: bool, verbose: bool) -> u32 {
     // variables
     let n: usize; // line string length
     let mut c: char; // char
@@ -224,18 +228,18 @@ fn line_sum_array(line: String, verbose: bool) -> u32 {
     let mut right: u32; // right digit value
     let mut sum: u32 = 0; // sum of first and last digit chars
     let mut line_bytes: Vec<u8> = Vec::from(line.as_bytes());
-    // convert string to bytes and loop over indices (the C way) not iterators (the Rust way).
     if verbose {
         println!("line: {}", std::str::from_utf8(&line_bytes).unwrap());
     }
     // loop over the byte array and collect digits of radix 10 (ASCII numbers)
     n = line_bytes.len();
     let mut j: usize = 0;
-    let mut k: usize;
+    let mut k: usize = n - 1;
     while j < n {
-        // check if j is start of digit word
-        // if true, convert first position to digit byte and update index j
-        words_to_digits_array(&mut line_bytes, &mut j, verbose);
+        // check if j is start of digit word; if true, update line_bytes[j] and j in-place
+        if replace {
+            words_to_digits_array(&mut line_bytes, j, verbose);
+        }
         //if verbose { println!("j: {}", j); }
         c = u8_to_char(line_bytes[j]);
         //if verbose { println!("c: {}", c); }
@@ -244,12 +248,11 @@ fn line_sum_array(line: String, verbose: bool) -> u32 {
             if verbose {
                 println!("{}: {}", "left", c);
             }
-            //for k in (j..n).rev() {
-            k = n - 1;
             while k >= j {
-                // check if k is start of digit word
-                // if true, convert first position to digit byte and update index j
-                words_to_digits_array(&mut line_bytes, &mut k, verbose);
+                // check if k is start of digit word; if true, update line_bytes[k] and k in-place
+                if replace {
+                    words_to_digits_array(&mut line_bytes, k, verbose);
+                }
                 //println!("k: {}", k);
                 c = u8_to_char(line_bytes[k]);
                 //println!("c: {}", c);
@@ -277,7 +280,7 @@ fn line_sum_array(line: String, verbose: bool) -> u32 {
  */
 #[allow(unused_assignments)]
 #[allow(dead_code)]
-fn line_sum_iterator(line: String, verbose: bool) -> u32 {
+fn line_sum_iterator(line: String, _replace: bool, verbose: bool) -> u32 {
     // variables
     let mut ch: Option<char>;
     let mut left: u32 = 0;
@@ -337,7 +340,7 @@ fn line_sum_iterator(line: String, verbose: bool) -> u32 {
  * Options: [ line_sum_array, line_sum_iterator ]
  */
 #[allow(dead_code)]
-fn line_sum_fn(f: impl Fn(String, bool) -> u32) -> impl Fn(String, bool) -> u32 {
+fn line_sum_fn(f: impl Fn(String, bool, bool) -> u32) -> impl Fn(String, bool, bool) -> u32 {
     return f; // f returns a function, f() returns a callback
 }
 
@@ -345,8 +348,8 @@ fn line_sum_fn(f: impl Fn(String, bool) -> u32) -> impl Fn(String, bool) -> u32 
  * Map function name string to function pointer.
  */
 #[allow(dead_code)]
-fn line_sum_fn_str(name: &str) -> impl Fn(String, bool) -> u32 {
-    let f: fn(String, bool) -> u32 = match name {
+fn line_sum_fn_str(name: &str) -> impl Fn(String, bool, bool) -> u32 {
+    let f: fn(String, bool, bool) -> u32 = match name {
         "array" => line_sum_array,
         "iterator" => line_sum_iterator,
         _ => unimplemented!(),
@@ -359,44 +362,40 @@ fn line_sum_fn_str(name: &str) -> impl Fn(String, bool) -> u32 {
  * If char byte is start of digit string bytes, convert to decimal char and increment index by string length.
  */
 #[allow(dead_code)]
-fn words_to_digits_array(line_bytes: &mut Vec<u8>, index: &mut usize, verbose: bool) -> () {
+fn words_to_digits_array(line_bytes: &mut Vec<u8>, index: usize, verbose: bool) -> () {
     // variables
     let mut word_bytes: &[u8]; // word byte array
     let mut word_len: usize; // word length
     let mut substring: &[u8]; // subarray from index to word end
-    let mut i: usize = 0;
-    let mut end: usize;
-    // loop over each key-value pair and replace words with digits. WORDS and DIGITS are equal length.
-    for word in WORDS {
+    let mut end: usize; // end index
+    for (i, word) in WORDS.iter().enumerate() {
+        // loop over each key-value pair and replace words with digits. WORDS and DIGITS are equal length.
         word_bytes = word.as_bytes();
         word_len = word_bytes.len();
-        end = *index + word_len;
+        end = index + word_len - 1;
         // bounds check
         if end > line_bytes.len() - 1 {
             continue;
         }
-        substring = &line_bytes[*index..end]; // slice from the starting index to n-char
-                                              /*
-                                              if verbose {
-                                                  println!(
-                                                      "string: {}, index: {}, end: {}, length: {}, substring: {}, word: {}",
-                                                      std::str::from_utf8(&line_bytes).unwrap(),
-                                                      index,
-                                                      end,
-                                                      word_len,
-                                                      std::str::from_utf8(&substring).unwrap(),
-                                                      word
-                                                  );
-                                              }
-                                              */
+        substring = &line_bytes[index..=end]; // slice from the starting index to n-char
+        if verbose {
+            println!(
+                "string: {}, index: {}, end: {}, length: {}, substring: {}, word: {}",
+                std::str::from_utf8(&line_bytes).unwrap(),
+                index,
+                end,
+                word_len,
+                std::str::from_utf8(&substring).unwrap(),
+                word
+            );
+        }
         if substring == word_bytes {
-            line_bytes[*index] = DIGITS[i];
+            line_bytes[index] = DIGITS[i];
             if verbose {
                 println!("updated: {}", std::str::from_utf8(&line_bytes).unwrap());
             }
-            *index += word_len;
+            break;
         }
-        i += 1;
     }
     return ();
 }
@@ -405,15 +404,15 @@ fn words_to_digits_array(line_bytes: &mut Vec<u8>, index: &mut usize, verbose: b
  * Find and replace integer words with digits. Idiomatic built-in method.
  */
 #[allow(dead_code)]
-fn words_to_digits_builtin(line: &str, verbose: bool) -> String {
+fn words_to_digits_builtin(line: String, verbose: bool) -> String {
     if verbose {
         println!("line: {}", line);
     }
-    let mut result: String = String::from(line);
+    let mut result: String = String::from("");
     // loop over each key-value pair and replace words with digits
     let kv: HashMap<String, u8> = generate_digits_hashmap();
     for (k, v) in kv {
-        result = result.replace(&k, std::str::from_utf8(&[v]).unwrap());
+        result = line.replace(&k, std::str::from_utf8(&[v]).unwrap());
     }
     return result;
 }
@@ -422,7 +421,7 @@ fn words_to_digits_builtin(line: &str, verbose: bool) -> String {
  * Find and replace integer words with digits. Aho-Corasick method from crate.
  */
 #[allow(dead_code)]
-fn words_to_digits_ac(line: &str, verbose: bool) -> String {
+fn words_to_digits_ac(line: String, verbose: bool) -> String {
     if verbose {
         println!("line: {}", line);
     }
@@ -431,6 +430,28 @@ fn words_to_digits_ac(line: &str, verbose: bool) -> String {
     ac.try_stream_replace_all(line.as_bytes(), &mut result, &[DIGITS])
         .unwrap();
     return String::from_utf8_lossy(&result).to_string();
+}
+
+/*
+ * Higher-order function to parametrically select which line sum method to apply.
+ * Options: [ line_sum_array, line_sum_iterator ]
+ */
+#[allow(dead_code)]
+fn words_to_digits_fn(f: impl Fn(String, bool) -> String) -> impl Fn(String, bool) -> String {
+    return f; // f returns a function, f() returns a callback
+}
+
+/*
+ * Map function name string to function pointer.
+ */
+#[allow(dead_code)]
+fn words_to_digits_fn_str(name: &str) -> impl Fn(String, bool) -> String {
+    let f: fn(String, bool) -> String = match name {
+        "builtin" => words_to_digits_builtin,
+        "ac" => words_to_digits_ac,
+        _ => unimplemented!(),
+    };
+    return f;
 }
 
 /*
@@ -452,15 +473,16 @@ An Advent of Code problem and solution generator implemented in Rust.
 Usage: main[EXE] [OPTIONS] [--input <PATH>] [--method <NAME>] [--verbose] [--problem] [--help]
 
 Options:
-  -i, --input <PATH>    Path to the input file [default: '.\']
-  -m, --method <NAME>   Line summation method. Options: ["array", "iterator"]. Default: "iterator".
-  -v, --verbose         Print debugging information
-  -p, --problem         Print problem statement
-  -h, --help            Print this help message
+  -i, --input <PATH>        Path to the input file. [default: '.\']
+  -s, --sum <NAME>          Line summation method. [options: ["array", "iterator"; default: "array"]
+  -r, --replace <NAME>      Word-to-digit method. [options: ["array", "builtin", "ac"; default: ""]
+  -v, --verbose             Print debugging information.
+  -p, --problem             Print problem statement.
+  -h, --help                Print this help message.
 
 Examples:
   $ /.main.exe --problem
-  $ /.main.exe --input .\data\input.txt --method array
+  $ /.main.exe --input .\data\input.txt --sum array --replace array
   $ /.main.exe --help
     "#;
     println!("{}", colorize(HELP, "red", false, false));
@@ -472,7 +494,8 @@ Examples:
 fn parse_args() -> Args {
     // defaults for variables that we store in CliArgs
     let mut input: PathBuf = Path::new("..").join("input.txt");
-    let mut method: String = String::from("array");
+    let mut method_sum: String = String::from("array");
+    let mut method_replace: String = String::from("");
     let mut verbose: bool = false;
     // loop over CLI arguments
     let mut cli_args: std::iter::Skip<env::Args> = env::args().skip(1);
@@ -483,9 +506,14 @@ fn parse_args() -> Args {
                     input = PathBuf::from(arg_input);
                 }
             }
-            "-m" | "--method" => {
-                if let Some(arg_method) = cli_args.next() {
-                    method = String::from(arg_method);
+            "-s" | "--sum" => {
+                if let Some(arg_method_sum) = cli_args.next() {
+                    method_sum = String::from(arg_method_sum);
+                }
+            }
+            "-r" | "--replace" => {
+                if let Some(arg_method_replace) = cli_args.next() {
+                    method_replace = String::from(arg_method_replace);
                 }
             }
             "-v" | "--verbose" => {
@@ -510,7 +538,8 @@ fn parse_args() -> Args {
     }
     return CliArgs {
         input,
-        method,
+        method_sum,
+        method_replace,
         verbose,
     };
 }
@@ -526,14 +555,27 @@ fn main() -> Result<(), &'static str> {
     // parse command-line arguments
     let args: Args = parse_args();
     if args.verbose {
-        println!("input: {}, method: {}", args.input.display(), args.method);
+        println!(
+            "input: {}, method-sum: {}, method-replace: {}",
+            args.input.display(),
+            args.method_sum,
+            args.method_replace
+        );
     }
+
+    // switch to enable/disable replacing words with digits
+    let enable_replace: bool = if args.method_replace == "" {
+        false
+    } else {
+        true
+    };
 
     // variables
     let mut i: usize; // line counter
     let mut sum: u32 = 0; // rolling sum
     let mut line_sum; // line_sum function
     let mut line_string: String;
+    let mut words_to_digits;
 
     // open `input.txt` file reader buffer
     if args.verbose {
@@ -552,12 +594,21 @@ fn main() -> Result<(), &'static str> {
                 colorize(i.to_string().as_str(), "green", true, false)
             );
         }
-        line_sum = line_sum_fn_str(&args.method);
+        line_sum = line_sum_fn_str(&args.method_sum);
         line_string = String::from(line.unwrap().as_str());
         if !line_string.is_ascii() {
             println!("Warning: String contains invalid ASCII: {}", line_string);
         }
-        sum += line_sum(line_string, args.verbose);
+        // treat array-based methods differently.
+        if args.method_sum == "array" {
+            sum += line_sum(line_string, enable_replace, args.verbose);
+        } else if enable_replace {
+            words_to_digits = words_to_digits_fn_str(&args.method_replace);
+            line_string = words_to_digits(line_string, true);
+            sum += line_sum(line_string, enable_replace, args.verbose);
+        } else {
+            sum += line_sum(line_string, enable_replace, args.verbose);
+        }
         if args.verbose {
             println!("{}: {}", "sum", sum);
         }
