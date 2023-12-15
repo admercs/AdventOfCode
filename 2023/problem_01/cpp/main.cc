@@ -85,33 +85,15 @@ void words_to_digits(std::string& str) {
     return;
 }
 
-// void words_to_digits(std::string& str) {
-//   for (auto& kv : DIGITS) {
-//     while (str.find(kv.first) != string::npos) {
-//       str.replace(str.find(kv.first), kv.first.size(), kv.second);
-//     }
-//   }
-//   return;
-// }
-
-// replace substring in string in-place
-//void replace_all(std::string& s, std::string const& s_old, std::string const& s_new) {
-//    std::string buf;
-//    std::size_t pos = 0;
-//    std::size_t pos_prev;
-//    // Reserves rough estimate of final size of string.
-//    buf.reserve(s.size());
-//    while (true) {
-//        pos_prev = pos;
-//        pos = s.find(s_old, pos);
-//        if (pos == std::string::npos) break;
-//        buf.append(s, pos_prev, pos - pos_prev);
-//        buf += s_new;
-//        pos += s_old.size();
-//    }
-//    buf.append(s, pos_prev, s.size() - pos_prev);
-//    s.swap(buf);
-//}
+// replace all digit words with integers in-place using the standard library
+void words_to_digits_std(std::string& str) {
+  for (auto& kv : DIGITS) {
+    while (str.find(kv.first) != std::string::npos) {
+      str.replace(str.find(kv.first), kv.first.size(), kv.second);
+    }
+  }
+  return;
+}
 
 // collect sum of left- and right-most digits in string.
 uint32_t line_sum(std::string line, bool VERBOSE) {
