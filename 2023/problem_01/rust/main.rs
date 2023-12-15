@@ -482,6 +482,7 @@ Options:
 
 Examples:
   $ /.main.exe --problem
+  $ /.main.exe --sum array --replace array
   $ /.main.exe --input .\data\input.txt --sum array --replace array
   $ /.main.exe --help
     "#;
