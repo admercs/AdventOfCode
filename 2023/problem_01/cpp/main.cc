@@ -9,9 +9,11 @@
 
 #include <cinttypes>
 #include <string>
+#include <vector>
 #include <unordered_map>
 #include <filesystem>
 #include <fstream>
+#include <cmath>
 #include <cstdio>
 
 ///
@@ -95,6 +97,21 @@ void words_to_digits_std(std::string& str) {
   return;
 }
 
+// concatenate a list of ints of order n to a single int.
+// example: [2, 3, 5] -> 235
+uint32_t concat(std::vector<uint32_t> ints) {
+    uint32_t sum = 0;
+    for (int i=0; i<ints.size(); ++i) {
+        sum += ints[i] * std::pow(10, i);
+    }
+    return sum;
+}
+
+// concatenate two ints to a single int.
+uint32_t concat(uint32_t left, uint32_t right) {
+    return (left * 10) + right;
+}
+
 // collect sum of left- and right-most digits in string.
 uint32_t line_sum(std::string line, bool VERBOSE) {
     // variables
@@ -120,7 +137,7 @@ uint32_t line_sum(std::string line, bool VERBOSE) {
                 if (std::isdigit(c)) {
                     (VERBOSE) && printf("right:  %c\n", c);
                     right = ctoi(c);
-                    sum = left + right;
+                    sum = concat(left, right);
                     (VERBOSE) && printf("sum:    %d\n", sum);
                     return sum;
                 }

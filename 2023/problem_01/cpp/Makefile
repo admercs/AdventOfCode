@@ -6,10 +6,10 @@ SRCS=main.cc
 all: build run
 
 build:
-	$(CXX) -o main.o $(SRCS)
+	$(CXX) -o main $(SRCS)
 
 run:
-	./main.o
+	./main
 
 clean:
-	$(RM) main.o
+	$(RM) main
