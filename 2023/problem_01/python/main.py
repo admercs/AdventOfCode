@@ -1,11 +1,11 @@
-""" main.py
+"""
+main.py
 
 Advent of Code 2023, December 1: Trebuchet, Part 1&2
  
 Copyright 2023 Adam Erickson, PhD
  
 2023-12-01
-
 """
 
 ###
@@ -21,7 +21,6 @@ import argparse
 
 # string {word: digit} key-value store
 DIGITS:dict = {
-    "zero":  "0",
     "one":   "1",
     "two":   "2",
     "three": "3",
@@ -50,40 +49,42 @@ ANSICODES:dict = {
 ### Functions
 ###
 
-def ctoi(char:chr) -> int:
+def ctoi(char:str) -> int:
     return ord(char) - 48  # same as `int(c - '0') or `int(c)`
 
-def words_to_digits(line:str) -> str:
+def words_to_digits(line:str, i:int) -> str:
     # variables
     n:int = len(line)
     # loop over each char, substring to end, and compare to keys in lookup table
-    for i in range(0, n, 1):
-        for k,v in DIGITS.items():
-            if (str[i] == k[0]):
-                n_key = len(k)
-                # check key length against char array bounds and then key
-                if (str.substr(i).size() >= n_key and str.substr(i, n_key) == k):
-                    str.replace(i, n_key, v)  # replace with digit if match found
-                    n = str.size()            # WARNING: update string size after replacement!
-    return None
+    for k,v in DIGITS.items():
+        if (line[i] == k[0]):
+            # check key length against char array bounds and then key
+            n_key = len(k)
+            if (line[i:i+n_key] == k):
+                line = line[0:i] + v + line[i+n_key:]  # replace with digit if match found
+    return line
 
-def line_sum(line:str) -> int:
+def line_sum(line:str, replace:bool) -> int:
     # variables
-    char:char = '0'
-    left:int  = 0
-    right:int = 0
-    summ:int  = 0
+    char:str   = '0'
+    left:int   = 0
+    right:int  = 0
+    concat:int = 0
     # loop over chars from left, then right
     for i in range(0, len(line), 1):
+        if replace:
+            line = words_to_digits(line, i)
         char = line[i]
         if char.isdigit():
             left = int(char)
             for j in range(len(line)-1, i-1, -1):
+                if replace:
+                    line = words_to_digits(line, j)
                 char = line[j]
                 if char.isdigit():
                     right = int(char)
-                    summ = left + right
-                    return summ
+                    concat = (left * 10) + right
+                    return concat
     return 0
 
 # colorize string using ANSI codes and escape sequences.
@@ -153,7 +154,7 @@ if __name__ == '__main__':
         for line in io:
             i += 1
             line_strip = line.strip()
-            total += line_sum(line_strip)
+            total += line_sum(line_strip, args.replace)
             if args.verbose:
                 print("%s:     %d" % (colorize("i", "green"), i))
                 print("line:  %s"  % line_strip)
