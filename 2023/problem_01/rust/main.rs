@@ -468,9 +468,9 @@ fn problem() {
  */
 fn help() {
     const HELP: &'static str = r#"
-An Advent of Code problem and solution generator implemented in Rust.
+Usage: main[EXE] [OPTIONS] [--input <PATH>] [--sum <NAME>] [--replace <NAME>] [--verbose] [--problem] [--help]
 
-Usage: main[EXE] [OPTIONS] [--input <PATH>] [--method <NAME>] [--verbose] [--problem] [--help]
+Return the solution to Advent of Code 2023-12-01: Trebuchet.
 
 Options:
   -i, --input <PATH>        Path to the input file. [default: '.\']
@@ -576,13 +576,13 @@ fn parse_args() -> Args {
 ///
 
 fn main() -> Result<(), &'static str> {
-    banner();
     // validate variable definitions
     assert!(WORDS.len() == DIGITS.len());
 
     // parse command-line arguments
     let args: Args = parse_args();
     if args.verbose {
+        banner();
         println!(
             "input: {}, method-sum: {}, method-replace: {}",
             args.input.display(),

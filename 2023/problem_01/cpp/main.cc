@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <functional>
 #include <filesystem>
 #include <fstream>
 #include <cmath>
@@ -25,7 +26,6 @@ using fspath = std::filesystem::path;
 
 // string {word: digit} key-value store
 std::unordered_map<std::string, std::string> DIGITS = {
-    {"zero",  "0"},
     {"one",   "1"},
     {"two",   "2"},
     {"three", "3"},
@@ -65,36 +65,9 @@ bool is_digit(char c) {
     return (d > 47 && d < 58) ? true : false;
 }
 
-// replace all digit words with integers in-place
-void words_to_digits(std::string& str) {
-    // variables
-    size_t n = str.size();
-    size_t n_key;
-    size_t i;
-    // loop over each char, substring to end, and compare to keys in lookup table
-    for (i=0; i<n; ++i) {
-        for (auto& kv : DIGITS) {
-            if (str[i] == kv.first[0]) {
-                n_key = kv.first.size();
-                // check key length against char array bounds and then key
-                if (str.substr(i).size() >= n_key && str.substr(i, n_key) == kv.first) {
-                    str.replace(i, n_key, kv.second);  // replace with digit if match found
-                    n = str.size();                    // WARNING: update string size after replacement!
-                }
-            }
-        }
-    }
-    return;
-}
-
-// replace all digit words with integers in-place using the standard library
-void words_to_digits_std(std::string& str) {
-  for (auto& kv : DIGITS) {
-    while (str.find(kv.first) != std::string::npos) {
-      str.replace(str.find(kv.first), kv.first.size(), kv.second);
-    }
-  }
-  return;
+// concatenate two ints to a single int.
+uint32_t concat(uint32_t left, uint32_t right) {
+    return (left * 10) + right;
 }
 
 // concatenate a list of ints of order n to a single int.
@@ -107,44 +80,63 @@ uint32_t concat(std::vector<uint32_t> ints) {
     return sum;
 }
 
-// concatenate two ints to a single int.
-uint32_t concat(uint32_t left, uint32_t right) {
-    return (left * 10) + right;
+// find and replace words with digits in-place.
+void words_to_digits(std::string& str, size_t i) {
+    // variables
+    size_t n_key;
+    // for char, substring to end, and compare to keys in lookup table
+    for (auto& kv : DIGITS) {
+        if (str[i] == kv.first[0]) {
+            // check key length against char array bounds and then key
+            n_key = kv.first.size();
+            if (str.substr(i).size() >= n_key && str.substr(i, n_key) == kv.first) {
+                str.replace(i, n_key, kv.second);  // replace word chars with digit if match found
+            }
+        }
+    }
+    return;
 }
 
 // collect sum of left- and right-most digits in string.
-uint32_t line_sum(std::string line, bool VERBOSE) {
+uint32_t line_sum(std::string line, bool REPLACE, bool VERBOSE) {
     // variables
-    // NOTE: we support UTF-8 (uint32) encoding, but digits are the same in ASCII (uint8)
+    // NOTE: supports full UTF-8 (uint32) encoding, but ASCII (uint8) is the same up to 128.
     size_t n = line.size();  // string n-char
     size_t i = 0;            // left iterator start position
     size_t j = n-1;          // right iterator start position
     char c;                  // char
     std::string word;        // char accumulation for dictionary mapping
     uint32_t left, right;    // left and right digits
-    uint32_t sum = 0;        // left-right digit sum
+    uint32_t digits = 0;   // left-right digit concatenation
     // increment right from left-most char
     for (; i<n; ++i) {
+        if (REPLACE) {
+            words_to_digits(line, i);
+            n = line.size();
+            j = n-1;
+        }
         c = line[i];
+        // REPLACE
         // if digit is found, record value and increment left from right-most char
         if (std::isdigit(c)) {
             (VERBOSE) && printf("left:   %c\n", c);
             left = ctoi(c);
             // decrement from right-most char until j=i (duplicate if single number)
             for (; j+1>i; --j) {
+                if (REPLACE) { words_to_digits(line, j); }
                 c = line[j];
                 // if digit is found on right, record it, calculate sum, return value
                 if (std::isdigit(c)) {
                     (VERBOSE) && printf("right:  %c\n", c);
                     right = ctoi(c);
-                    sum = concat(left, right);
-                    (VERBOSE) && printf("sum:    %d\n", sum);
-                    return sum;
+                    digits = concat(left, right);
+                    (VERBOSE) && printf("concat: %d\n", digits);
+                    return digits;
                 }
             }
         }
     }
-    return sum;
+    return digits;
 }
 
 // colorize string using ANSI codes and escape sequences
@@ -169,20 +161,68 @@ std::string colorize(std::string str, std::string color="default", bool back=fal
     return "\033[" + code_string + "m" + str + "\033[0m";
 }
 
+// Print the problem statement.
+void problem() {
+    fspath filepath = "../problem.txt";
+    std::ifstream file = filepath;
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string statement = buffer.str();
+    printf("\n%s\n", colorize(statement, "cyan", false, false).c_str());
+}
+
 // help message.
 void help() {
-    const std::string message = R"(
-    ./main [--replace|-r] [--verbose|-v] [--help|-h]
+    const std::string MESSAGE = R"(
+Usage: main[EXE] [OPTIONS] [--input <PATH>] [--replace <NAME>] [--verbose] [--problem] [--help]
 
-    Return the solution to Advent of Code 2023-12-01: Trebuchet.
+Return the solution to Advent of Code 2023-12-01: Trebuchet.
 
-    where:
-      -r | --replace    Enable replacement of string words with digits.
-      -v | --verbose    Enable verbose message output.
-      -h | --help       Print this help message and exit.
+Options:
+  -i, --input <PATH>    Path to the input file. [default: '.\']
+  -v, --verbose         Enable verbose message output.
+  -p, --problem         Print problem statement.
+  -h, --help            Print this help message and exit.
+
+Examples:
+  $ ./main --problem
+  $ ./main --replace iterator
     )";
-    printf("%s\n", colorize(message, "red").c_str());
+
+    printf("%s\n", colorize(MESSAGE, "cyan").c_str());
     return;
+}
+
+bool banner() {
+    const std::string BANNER = R"(
+    Advent of Code 2023
+    December 01: Trebuchet!
+                             .`.
+                            / `.`.
+     ______________________/____`_`____________________________
+    / .''.  _        _           _          _           __..--->.
+    \ '()'       _       .''.        _       ____...---'       .'
+     |_||______.`.__  .' .'______......-----'                 /
+      .||-||-./ `.`.' .'   \/_/  `./   /`.`.                .'
+    .'_||__.'/ (O)`.`.    \/_/     `./   /`.`.             /
+    |_ -  _|/\     /`.`. \/_/        `./   /`.`.          /
+    | - _  /\   ./   /`.`. /___________`./   /`.`._     .'
+    '-----/\  \/ `./   /`.`._____________`._____` .|   /
+         /\  \/_/  `./   /`.`.________________.'.'.' .'
+        /\  \/_/   .-`./   /`.`.---------.''.-----.-'
+       /\  \/_/  .'~ _ `./   /`.`. _ ~   '..'`._.'
+    .'/\  \/_/  '--------`./   /`.`.-----------' 
+  .' /\  \/ /______________`./   /`.`..'.'.'
+.'__/____/___________________`._____` .'.'
+|____________________________________|.'
+    )";
+    printf("%s\n", colorize(BANNER, "cyan", false, false).c_str());
+    return 1;
+}
+
+// help funtion to check if argument exists.
+bool arg_exists(char* argv[], int i) {
+    return (argv[i] != NULL) ? true : false;
 }
 
 ///
@@ -192,17 +232,28 @@ void help() {
 int main(int argc, char* argv[]) {
 
     // parse command-line arguments
-    bool REPLACE = false;  // replace string words with digits
-    bool VERBOSE = false;  // enable debugging mode
+    fspath filepath = "../input.txt";
+    bool REPLACE = false;  // default
+    bool VERBOSE = false;  // default
 
-    size_t i;
-    for (i=1; i<argc; ++i) {
+    for (int i=1; i<argc; ++i) {
         std::string arg = argv[i];
         //printf("arg: %s\n", arg.c_str());
-        if (arg == "--replace" || arg == "-r") {
+        if (arg == "--input" || arg == "-i") {
+            if (arg_exists(argv, i+1)) {
+                filepath = argv[i+1];
+                ++i;
+            } else {
+                printf("Argument not found: filepath\n");
+                return 1;
+            }
+        } else if (arg == "--replace" || arg == "-r") {
             REPLACE = true;
         } else if (arg == "--verbose" || arg == "-v") {
             VERBOSE = true;
+        } else if (arg == "--problem" || arg == "-p") {
+            problem();
+            return 0;
         } else if (arg == "--help" || arg == "-h") {
             help();
             return 0;
@@ -211,13 +262,11 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     }
-    (VERBOSE) && printf("VERBOSE mode enabled.\n");
-    (REPLACE) && printf("REPLACE string words with digits enabled.\n");
+    (VERBOSE) && banner();
+    (VERBOSE) && (REPLACE) && printf("Replacing string words with digits.\n");
 
     // variables
-    std::string filename = "../input.txt";
-    fspath filepath      = filename;
-    std::ifstream file   = filepath;
+    std::ifstream file = filepath;
     std::string line;
     std::string line_digits;
     uint32_t sum_line;
@@ -232,16 +281,14 @@ int main(int argc, char* argv[]) {
                 printf("#: %d\n", counter);
                 printf("line:   %s\n", line.c_str());
             }
-            if (REPLACE) {
-                words_to_digits(line);
-            }
             (VERBOSE) && printf("digits: %s\n", line.c_str());
-            sum_line   = line_sum(line, VERBOSE);
+            sum_line   = line_sum(line, REPLACE, VERBOSE);
             sum_total += sum_line;
-            (VERBOSE) && printf("total:  %d\n---\n", sum_total);
         }
         file.close();
     }
-    printf("%d", sum_total);
+    printf("%d\n", sum_total);
     return 0;
 }
+
+// 56322 < sum < 56805
