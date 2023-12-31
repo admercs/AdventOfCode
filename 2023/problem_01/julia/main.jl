@@ -21,8 +21,7 @@ using Base: ImmutableDict
 
 DEBUG::Bool = false
 
-DIGITS::ImmutableDict{String, Char} = {
-    "zero"  => '0',
+DIGITS::ImmutableDict{String, Char} = ImmutableDict(
     "one"   => '1',
     "two"   => '2',
     "three" => '3',
@@ -32,9 +31,9 @@ DIGITS::ImmutableDict{String, Char} = {
     "seven" => '7',
     "eight" => '8',
     "nine"  => '9'
-}
+)
 
-ANSICODES::ImmutableDict{String, Int} = {
+ANSICODES::ImmutableDict{String, Int} = ImmutableDict(
     "black"   => 30,
     "red"     => 31,
     "green"   => 32,
@@ -44,7 +43,7 @@ ANSICODES::ImmutableDict{String, Int} = {
     "cyan"    => 36,
     "white"   => 37,
     "default" => 39
-}
+)
 
 ###
 ### Functions
@@ -54,23 +53,45 @@ function ctoi(char::Char)::Int
     return Int(char) - 48  # same as `Int(c - '0')`
 end
 
-function line_sum(line::String)::Int
+function word_to_digit(line::String, i::Int)::String
+    # loop over each char, substring to end, and compare to keys in lookup table
+    for (k,v) in DIGITS
+        if line[i] == k[1]
+            # check key length against char array bounds and then key
+            n_key = length(k)
+            if length(line[i:end]) >= n_key && line[i:i+n_key-1] == k
+                line = line[1:i-1] * v * line[i+n_key:end]  # replace with digit if match found
+            end
+        end
+    end
+    return line
+end
+
+function line_sum(line::String, replace::Bool)::Int
     # variables
-    left::Int  = 0
-    right::Int = 0
-    sum::Int   = 0
-    char::Char = Char(48)
+    n::Int      = lastindex(line)
+    left::Int   = 0
+    right::Int  = 0
+    concat::Int = 0
+    char::Char  = Char(48)  # 0
     # loop over chars from left, then right
-    for i = firstindex(line):1:lastindex(line)
+    for i = firstindex(line):1:n
+        if replace
+            line = word_to_digit(line, i)
+            n = lastindex(line)
+        end
         char = line[i]
         if isdigit(char)
             left = ctoi(char)
             for j = lastindex(line):-1:i
+                if replace
+                    line = word_to_digit(line, j)
+                end
                 char = line[j]
                 if isdigit(char)
                     right = ctoi(char)
-                    sum = left + right
-                    return sum
+                    concat = (left * 10) + right
+                    return concat
                 end
             end
         end
@@ -78,7 +99,7 @@ function line_sum(line::String)::Int
     return 0
 end
 
-function file_sum(filepath::String)::Int
+function file_sum(filepath::String, replace::Bool)::Int
     isfile(filepath) || throw(ErrorException("File path is invalid."))
     # variables
     total::Int = 0
@@ -87,7 +108,7 @@ function file_sum(filepath::String)::Int
         while ! eof(io)
             line = readline(io)
             DEBUG && println(line)
-            total += line_sum(line)
+            total += line_sum(line, replace)
         end
     end
     return total
@@ -157,7 +178,7 @@ function main()::Int
 
     # processing data
     filepath = abspath(joinpath("..", "input.txt"))
-    total = file_sum(filepath)
+    total = file_sum(filepath, REPLACE)
     @printf("%d", total)
     return 0
 end

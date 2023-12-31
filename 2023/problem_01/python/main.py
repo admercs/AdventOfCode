@@ -53,8 +53,6 @@ def ctoi(char:str) -> int:
     return ord(char) - 48  # same as `int(c - '0') or `int(c)`
 
 def words_to_digits(line:str, i:int) -> str:
-    # variables
-    n:int = len(line)
     # loop over each char, substring to end, and compare to keys in lookup table
     for k,v in DIGITS.items():
         if (line[i] == k[0]):
