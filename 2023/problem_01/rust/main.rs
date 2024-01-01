@@ -15,6 +15,8 @@
 //!   -
 //!
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
@@ -43,7 +45,7 @@ use aho_corasick::AhoCorasick;
 struct CliArgs {
     input: PathBuf,
     method_sum: String,
-    method_replace: String,
+    replace: bool,
     verbose: bool,
 }
 type Args = CliArgs;
@@ -51,10 +53,11 @@ type Args = CliArgs;
 /*
  * Digit string-to-byte key-value store.
  */
-static WORDS: [&str; 10] = [
-    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+static WORDS: [&str; 9] = [
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
 ];
-static DIGITS: [u8; 10] = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57]; // ASCII/UTF-8 byte encoding
+static DIGITS: [&str; 9] = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+static INTS: [u8; 9] = [49, 50, 51, 52, 53, 54, 55, 56, 57]; // ASCII/UTF-8 byte encoding
 
 ///
 /// Functions
@@ -63,10 +66,9 @@ static DIGITS: [u8; 10] = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57]; // ASCII/UTF
 /*
  * Zip two string arrays into a hashmap.
  */
-#[allow(dead_code)]
 fn generate_digits_hashmap() -> HashMap<String, u8> {
     let mut map: HashMap<String, u8> = HashMap::new();
-    for (k, v) in WORDS.into_iter().zip(DIGITS.into_iter()) {
+    for (k, v) in WORDS.into_iter().zip(INTS.into_iter()) {
         map.insert(String::from(k), v);
     }
     return map;
@@ -75,10 +77,8 @@ fn generate_digits_hashmap() -> HashMap<String, u8> {
 /*
  * Get digit char for string. Approximate HashMap.
  */
-#[allow(dead_code)]
 fn get_digit_char(word: &str) -> char {
     let digit: char = match word {
-        "zero" => '0',
         "one" => '1',
         "two" => '2',
         "three" => '3',
@@ -96,7 +96,6 @@ fn get_digit_char(word: &str) -> char {
 /*
  * Get digit byte for byte-array. Approximate HashMap.
  */
-#[allow(dead_code)]
 fn get_digit_u8(word: &[u8]) -> u8 {
     let digit: u8 = match word {
         [b'z', b'e', b'r', b'o'] => 0,
@@ -130,7 +129,6 @@ fn get_digit_u8(word: &[u8]) -> u8 {
  * | Default |  39  | 49         | 99           | 109                |
  * -------------------------------------------------------------------
  */
-#[allow(dead_code)]
 fn colorize(text: &str, color: &str, bright: bool, back: bool) -> String {
     let mut code: u8 = match color {
         "black" => 30,
@@ -156,7 +154,6 @@ fn colorize(text: &str, color: &str, bright: bool, back: bool) -> String {
 /*
  * Encode u8 to char (ASCII/UTF-8).
  */
-#[allow(dead_code)]
 fn u8_to_char(bytes: u8) -> char {
     let d: u32 = u32::from(bytes);
     let c: char = char::from_u32(d).unwrap();
@@ -166,7 +163,6 @@ fn u8_to_char(bytes: u8) -> char {
 /*
  * Decode char (ASCII) to u8.
  */
-#[allow(dead_code)]
 fn char_to_u8(c: char) -> u8 {
     let u: u8 = c as u8;
     return u - 48; // same as char - '0'
@@ -175,7 +171,6 @@ fn char_to_u8(c: char) -> u8 {
 /*
  * Decode char (ASCII/UTF-8) to u32.
  */
-#[allow(dead_code)]
 fn char_to_u32(c: char) -> u32 {
     let u: u32 = u32::from(c);
     return u - 48; // same as char - '0'
@@ -184,7 +179,6 @@ fn char_to_u32(c: char) -> u32 {
 /*
  * Check if byte array is valid ASCII/UTF-8 codes.
  */
-#[allow(dead_code)]
 fn is_utf8_bytes(data: &[u8]) -> bool {
     match std::str::from_utf8(&data[0..std::cmp::min(data.len(), 4)]) {
         Ok(s) => s.chars().next().is_some(),
@@ -195,7 +189,6 @@ fn is_utf8_bytes(data: &[u8]) -> bool {
 /*
  * Determine whether byte is a valid ASCII digit in the range 48-57.
  */
-#[allow(dead_code)]
 fn is_utf8_byte(byte: u8) -> bool {
     return if byte > 47 && byte < 58 { true } else { false };
 }
@@ -204,7 +197,6 @@ fn is_utf8_byte(byte: u8) -> bool {
  * Read lines from a file path. Output is wrapped in a Result to allow matching on errors.
  * Returns an Iterator to the Reader of the lines of the file.
  */
-#[allow(dead_code)]
 fn read_lines<P>(filename: P) -> IoResult<Lines<BufReader<File>>>
 where
     P: AsRef<Path>,
@@ -214,12 +206,83 @@ where
 }
 
 /*
+ * Find and replace words with digits from the zeroth index. The outer function increments the index.
+ * If char byte is start of digit string bytes, convert to decimal char and increment index by string length.
+ */
+fn words_to_digits_array(line_bytes: &mut Vec<u8>, index: usize, verbose: bool) -> () {
+    // variables
+    let mut word_bytes: &[u8]; // word byte array
+    let mut word_len: usize; // word length
+    let mut substring: &[u8]; // subarray from index to word end
+    let mut end: usize; // end index
+    for (i, word) in WORDS.iter().enumerate() {
+        // loop over each key-value pair and replace words with digits. WORDS and DIGITS are equal length.
+        word_bytes = word.as_bytes();
+        word_len = word_bytes.len();
+        end = index + word_len - 1;
+        // bounds check
+        if end > line_bytes.len() - 1 {
+            continue;
+        }
+        substring = &line_bytes[index..=end]; // slice from the starting index to n-char
+                                              //if verbose {
+                                              //    println!(
+                                              //        "string: {}, index: {}, end: {}, length: {}, substring: {}, word: {}",
+                                              //        std::str::from_utf8(&line_bytes).unwrap(),
+                                              //        index,
+                                              //        end,
+                                              //        word_len,
+                                              //        std::str::from_utf8(&substring).unwrap(),
+                                              //        word
+                                              //    );
+                                              //}
+        if substring == word_bytes {
+            line_bytes[index] = INTS[i];
+            if verbose {
+                println!("updated: {}", std::str::from_utf8(&line_bytes).unwrap());
+            }
+            break;
+        }
+    }
+    return ();
+}
+
+/*
+ * Find and replace integer words with digits. Idiomatic built-in method.
+ */
+fn words_to_digits_builtin(line: String, verbose: bool) -> String {
+    if verbose {
+        println!("line: {}", line);
+    }
+    let mut result: String = String::from("");
+    // loop over each key-value pair and replace words with digits
+    let kv: HashMap<String, u8> = generate_digits_hashmap();
+    for (k, v) in kv {
+        result = line.replace(&k, std::str::from_utf8(&[v]).unwrap());
+    }
+    return result;
+}
+
+/*
+ * Find and replace integer words with digits. Aho-Corasick method from crate.
+ */
+fn words_to_digits_ac(line: String, verbose: bool) -> String {
+    if verbose {
+        println!("line: {}", line);
+    }
+    let mut result: Vec<u8> = vec![];
+    let ac: AhoCorasick = AhoCorasick::new(WORDS).unwrap();
+    ac.try_stream_replace_all(line.as_bytes(), &mut result, &[INTS])
+        .unwrap();
+    return String::from_utf8_lossy(&result).to_string();
+}
+
+/*
  * Loop over line string (char array) and return the sum of outermost digits.
  * We do not use mutability on left or right, but the compiler complains anyway.
  * Convert string to bytes and loop over indices (the C way) not iterators (the Rust way).
  */
 #[allow(unused_mut)]
-#[allow(dead_code)]
 fn line_sum_array(line: String, replace: bool, verbose: bool) -> u32 {
     // variables
     let n: usize; // line string length
@@ -261,9 +324,9 @@ fn line_sum_array(line: String, replace: bool, verbose: bool) -> u32 {
                     if verbose {
                         println!("{}: {}", "right", c);
                     }
-                    sum = left + right;
+                    sum = (left * 10) + right;
                     if verbose {
-                        println!("{} + {} = {}", left, right, sum);
+                        println!("{}{} = {}", left, right, sum);
                     }
                     return sum;
                 }
@@ -279,36 +342,54 @@ fn line_sum_array(line: String, replace: bool, verbose: bool) -> u32 {
  * Idiomatic Rusty variant of `line_sum` function. For comparison of readability and performance.
  */
 #[allow(unused_assignments)]
-#[allow(dead_code)]
-fn line_sum_iterator(line: String, _replace: bool, verbose: bool) -> u32 {
+fn line_sum_iterator(mut line: String, replace: bool, verbose: bool) -> u32 {
     // variables
-    let mut ch: Option<char>;
+    let mut ch: Option<(usize, char)>;
     let mut left: u32 = 0;
     let mut right: u32 = 0;
-    let mut sum: u32 = 0; // sum of first and last digit chars
+    let mut sum: u32 = 0;  // sum of first and last digit chars
     if verbose {
         println!("line: {}", line);
     }
-    let mut chars: std::str::Chars<'_> = line.chars();
     // loop over chars from left and then from right if digit is found
     loop {
-        ch = chars.next(); // pop value from left
+        ch = line.char_indices().next();  // pop value from left
         if ch.is_none() {
             break;
         }
-        if ch.unwrap().is_digit(10) {
+        if replace {
+            let j: usize = ch.unwrap().0;
+            for (i, word) in WORDS.iter().enumerate() {
+                let n: usize = word.len();
+                if (line.char_indices().last().unwrap().0 < j + n) && (&&line[j..j + n] == word) {
+                    line.replace_range(j..j + 1, DIGITS[i]);
+                    break;
+                }
+            }
+        }
+        if ch.unwrap().1.is_digit(10) {
             // if character is a valid ASCII/UTF-8 digit
-            left = char_to_u32(ch.unwrap());
+            left = char_to_u32(ch.unwrap().1);
             if verbose {
                 println!("left: {}", left);
             }
             loop {
-                ch = chars.next_back(); // pop value from right
+                ch = line.char_indices().next_back(); // pop value from right
                 if ch.is_none() {
                     break;
                 }
-                if ch.unwrap().is_digit(10) {
-                    right = char_to_u32(ch.unwrap());
+                if replace {
+                    let k: usize = ch.unwrap().0;
+                    for (i, word) in WORDS.iter().enumerate() {
+                        let n: usize = word.len();
+                        if (line.char_indices().last().unwrap().0 < k + n) && (&&line[k..k + n] == word) {
+                            line.replace_range(k..k + 1, DIGITS[i]);
+                            break;
+                        }
+                    }
+                }
+                if ch.unwrap().1.is_digit(10) {
+                    right = char_to_u32(ch.unwrap().1);
                     if verbose {
                         println!("right: {}", right);
                     }
@@ -322,12 +403,12 @@ fn line_sum_iterator(line: String, _replace: bool, verbose: bool) -> u32 {
         }
     }
     if right == 0 {
-        sum = left + left;
+        sum = (left * 10) + left;
         if verbose {
             println!("{} + {} = {}", left, left, sum);
         }
     } else {
-        sum = left + right;
+        sum = (left * 10) + right;
         if verbose {
             println!("{} + {} = {}", left, right, sum);
         }
@@ -339,7 +420,6 @@ fn line_sum_iterator(line: String, _replace: bool, verbose: bool) -> u32 {
  * Higher-order function to parametrically select which line sum method to apply.
  * Options: [ line_sum_array, line_sum_iterator ]
  */
-#[allow(dead_code)]
 fn line_sum_fn(f: impl Fn(String, bool, bool) -> u32) -> impl Fn(String, bool, bool) -> u32 {
     return f; // f returns a function, f() returns a callback
 }
@@ -347,108 +427,10 @@ fn line_sum_fn(f: impl Fn(String, bool, bool) -> u32) -> impl Fn(String, bool, b
 /*
  * Map function name string to function pointer.
  */
-#[allow(dead_code)]
 fn line_sum_fn_str(name: &str) -> impl Fn(String, bool, bool) -> u32 {
     let f: fn(String, bool, bool) -> u32 = match name {
         "array" => line_sum_array,
         "iterator" => line_sum_iterator,
-        _ => unimplemented!(),
-    };
-    return f;
-}
-
-/*
- * Find and replace words with digits from the zeroth index. The outer function increments the index.
- * If char byte is start of digit string bytes, convert to decimal char and increment index by string length.
- */
-#[allow(dead_code)]
-fn words_to_digits_array(line_bytes: &mut Vec<u8>, index: usize, verbose: bool) -> () {
-    // variables
-    let mut word_bytes: &[u8]; // word byte array
-    let mut word_len: usize; // word length
-    let mut substring: &[u8]; // subarray from index to word end
-    let mut end: usize; // end index
-    for (i, word) in WORDS.iter().enumerate() {
-        // loop over each key-value pair and replace words with digits. WORDS and DIGITS are equal length.
-        word_bytes = word.as_bytes();
-        word_len = word_bytes.len();
-        end = index + word_len - 1;
-        // bounds check
-        if end > line_bytes.len() - 1 {
-            continue;
-        }
-        substring = &line_bytes[index..=end]; // slice from the starting index to n-char
-                                              //if verbose {
-                                              //    println!(
-                                              //        "string: {}, index: {}, end: {}, length: {}, substring: {}, word: {}",
-                                              //        std::str::from_utf8(&line_bytes).unwrap(),
-                                              //        index,
-                                              //        end,
-                                              //        word_len,
-                                              //        std::str::from_utf8(&substring).unwrap(),
-                                              //        word
-                                              //    );
-                                              //}
-        if substring == word_bytes {
-            line_bytes[index] = DIGITS[i];
-            if verbose {
-                println!("updated: {}", std::str::from_utf8(&line_bytes).unwrap());
-            }
-            break;
-        }
-    }
-    return ();
-}
-
-/*
- * Find and replace integer words with digits. Idiomatic built-in method.
- */
-#[allow(dead_code)]
-fn words_to_digits_builtin(line: String, verbose: bool) -> String {
-    if verbose {
-        println!("line: {}", line);
-    }
-    let mut result: String = String::from("");
-    // loop over each key-value pair and replace words with digits
-    let kv: HashMap<String, u8> = generate_digits_hashmap();
-    for (k, v) in kv {
-        result = line.replace(&k, std::str::from_utf8(&[v]).unwrap());
-    }
-    return result;
-}
-
-/*
- * Find and replace integer words with digits. Aho-Corasick method from crate.
- */
-#[allow(dead_code)]
-fn words_to_digits_ac(line: String, verbose: bool) -> String {
-    if verbose {
-        println!("line: {}", line);
-    }
-    let mut result: Vec<u8> = vec![];
-    let ac: AhoCorasick = AhoCorasick::new(WORDS).unwrap();
-    ac.try_stream_replace_all(line.as_bytes(), &mut result, &[DIGITS])
-        .unwrap();
-    return String::from_utf8_lossy(&result).to_string();
-}
-
-/*
- * Higher-order function to parametrically select which line sum method to apply.
- * Options: [ line_sum_array, line_sum_iterator ]
- */
-#[allow(dead_code)]
-fn words_to_digits_fn(f: impl Fn(String, bool) -> String) -> impl Fn(String, bool) -> String {
-    return f; // f returns a function, f() returns a callback
-}
-
-/*
- * Map function name string to function pointer.
- */
-#[allow(dead_code)]
-fn words_to_digits_fn_str(name: &str) -> impl Fn(String, bool) -> String {
-    let f: fn(String, bool) -> String = match name {
-        "builtin" => words_to_digits_builtin,
-        "ac" => words_to_digits_ac,
         _ => unimplemented!(),
     };
     return f;
@@ -468,22 +450,22 @@ fn problem() {
  */
 fn help() {
     const HELP: &'static str = r#"
-Usage: main[EXE] [OPTIONS] [--input <PATH>] [--sum <NAME>] [--replace <NAME>] [--verbose] [--problem] [--help]
+Usage: main[EXE] [OPTIONS] [--input <PATH>] [--sum <NAME>] [--replace] [--verbose] [--problem] [--help]
 
 Return the solution to Advent of Code 2023-12-01: Trebuchet.
 
 Options:
   -i, --input <PATH>        Path to the input file. [default: '.\']
   -s, --sum <NAME>          Line summation method. [options: ["array", "iterator"; default: "array"]
-  -r, --replace <NAME>      Word-to-digit method. [options: ["array", "builtin", "ac"; default: ""]
+  -r, --replace             Replace words with digits.
   -v, --verbose             Print debugging information.
   -p, --problem             Print problem statement.
   -h, --help                Print this help message.
 
 Examples:
   $ /.main.exe --problem
-  $ /.main.exe --sum array --replace array
-  $ /.main.exe --input .\data\input.txt --sum array --replace array
+  $ /.main.exe --sum array --replace
+  $ /.main.exe --input .\data\input.txt --sum array --replace
   $ /.main.exe --help
     "#;
     println!("{}", colorize(HELP, "cyan", false, false));
@@ -522,7 +504,7 @@ fn parse_args() -> Args {
     // defaults for variables that we store in CliArgs
     let mut input: PathBuf = Path::new("..").join("input.txt");
     let mut method_sum: String = String::from("array");
-    let mut method_replace: String = String::from("");
+    let mut replace: bool = false;
     let mut verbose: bool = false;
     // loop over CLI arguments
     let mut cli_args: std::iter::Skip<env::Args> = env::args().skip(1);
@@ -539,9 +521,7 @@ fn parse_args() -> Args {
                 }
             }
             "-r" | "--replace" => {
-                if let Some(arg_method_replace) = cli_args.next() {
-                    method_replace = String::from(arg_method_replace);
-                }
+                replace = true;
             }
             "-v" | "--verbose" => {
                 verbose = true;
@@ -566,7 +546,7 @@ fn parse_args() -> Args {
     return CliArgs {
         input,
         method_sum,
-        method_replace,
+        replace,
         verbose,
     };
 }
@@ -578,6 +558,7 @@ fn parse_args() -> Args {
 fn main() -> Result<(), &'static str> {
     // validate variable definitions
     assert!(WORDS.len() == DIGITS.len());
+    assert!(DIGITS.len() == INTS.len());
 
     // parse command-line arguments
     let args: Args = parse_args();
@@ -587,23 +568,15 @@ fn main() -> Result<(), &'static str> {
             "input: {}, method-sum: {}, method-replace: {}",
             args.input.display(),
             args.method_sum,
-            args.method_replace
+            args.replace
         );
     }
-
-    // switch to enable/disable replacing words with digits
-    let enable_replace: bool = if args.method_replace == "" {
-        false
-    } else {
-        true
-    };
 
     // variables
     let mut i: usize; // line counter
     let mut sum: u32 = 0; // rolling sum
     let mut line_sum; // line_sum function
     let mut line_string: String;
-    let mut words_to_digits;
 
     // open `input.txt` file reader buffer
     if args.verbose {
@@ -627,16 +600,7 @@ fn main() -> Result<(), &'static str> {
         if !line_string.is_ascii() {
             println!("Warning: String contains invalid ASCII: {}", line_string);
         }
-        // treat array-based methods differently.
-        if args.method_sum == "array" {
-            sum += line_sum(line_string, enable_replace, args.verbose);
-        } else if enable_replace {
-            words_to_digits = words_to_digits_fn_str(&args.method_replace);
-            line_string = words_to_digits(line_string, true);
-            sum += line_sum(line_string, enable_replace, args.verbose);
-        } else {
-            sum += line_sum(line_string, enable_replace, args.verbose);
-        }
+        sum += line_sum(line_string, args.replace, args.verbose);
         if args.verbose {
             println!("{}: {}", "sum", sum);
         }
