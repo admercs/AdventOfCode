@@ -167,8 +167,19 @@ void problem() {
     std::ifstream file = filepath;
     std::stringstream buffer;
     buffer << file.rdbuf();
-    std::string statement = buffer.str();
-    printf("\n%s\n", colorize(statement, "cyan", false, false).c_str());
+    std::string PROBLEM = buffer.str();
+    printf("\n%s\n", colorize(PROBLEM, "cyan", false, false).c_str());
+}
+
+// print the banner.
+void banner() {
+    fspath filepath = "../banner.txt";
+    std::ifstream file = filepath;
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string BANNER = buffer.str();
+    printf("\n%s\n", colorize(BANNER, "cyan", false, false).c_str());
+    return;
 }
 
 // help message.
@@ -191,33 +202,6 @@ Examples:
 
     printf("%s\n", colorize(MESSAGE, "cyan").c_str());
     return;
-}
-
-bool banner() {
-    const std::string BANNER = R"(
-    Advent of Code 2023
-    December 01: Trebuchet!
-                             .`.
-                            / `.`.
-     ______________________/____`_`____________________________
-    / .''.  _        _           _          _           __..--->.
-    \ '()'       _       .''.        _       ____...---'       .'
-     |_||______.`.__  .' .'______......-----'                 /
-      .||-||-./ `.`.' .'   \/_/  `./   /`.`.                .'
-    .'_||__.'/ (O)`.`.    \/_/     `./   /`.`.             /
-    |_ -  _|/\     /`.`. \/_/        `./   /`.`.          /
-    | - _  /\   ./   /`.`. /___________`./   /`.`._     .'
-    '-----/\  \/ `./   /`.`._____________`._____` .|   /
-         /\  \/_/  `./   /`.`.________________.'.'.' .'
-        /\  \/_/   .-`./   /`.`.---------.''.-----.-'
-       /\  \/_/  .'~ _ `./   /`.`. _ ~   '..'`._.'
-    .'/\  \/_/  '--------`./   /`.`.-----------' 
-  .' /\  \/ /______________`./   /`.`..'.'.'
-.'__/____/___________________`._____` .'.'
-|____________________________________|.'
-    )";
-    printf("%s\n", colorize(BANNER, "cyan", false, false).c_str());
-    return 1;
 }
 
 // help funtion to check if argument exists.
@@ -262,7 +246,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     }
-    (VERBOSE) && banner();
+    if (VERBOSE) banner();
     (VERBOSE) && (REPLACE) && printf("Replacing string words with digits.\n");
 
     // variables
@@ -290,5 +274,3 @@ int main(int argc, char* argv[]) {
     printf("%d\n", sum_total);
     return 0;
 }
-
-// 56322 < sum < 56805
