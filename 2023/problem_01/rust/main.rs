@@ -193,12 +193,18 @@ fn is_utf8_byte(byte: u8) -> bool {
     return if byte > 47 && byte < 58 { true } else { false };
 }
 
-fn concat_u8_pair(left: u8, right: u8) -> u8 {
+/* Concatenate a pair of integers. */
+fn concat_u32_pair(left: u32, right: u32) -> u32 {
     return (left * 10) + right;
 }
 
+/* Concatenate an array of integers. */
 fn concat_u32_array(ints: &[u32]) -> u32 {
-    return ints.iter().enumerate().map(|(i,x)|x*(u32::pow(10, (ints.len()-i) as u32))).sum();
+    return ints
+        .iter()
+        .enumerate()
+        .map(|(i, x)| x * (u32::pow(10, (ints.len() - i) as u32)))
+        .sum();
 }
 
 /*
@@ -355,13 +361,13 @@ fn line_sum_iterator(mut line: String, replace: bool, verbose: bool) -> u32 {
     let mut ch: Option<(usize, char)>;
     let mut left: u32 = 0;
     let mut right: u32 = 0;
-    let mut sum: u32 = 0;  // sum of first and last digit chars
+    let mut sum: u32 = 0; // sum of first and last digit chars
     if verbose {
         println!("line: {}", line);
     }
     // loop over chars from left and then from right if digit is found
     loop {
-        ch = line.char_indices().next();  // pop value from left
+        ch = line.char_indices().next(); // pop value from left
         if ch.is_none() {
             break;
         }
@@ -390,7 +396,9 @@ fn line_sum_iterator(mut line: String, replace: bool, verbose: bool) -> u32 {
                     let k: usize = ch.unwrap().0;
                     for (i, word) in WORDS.iter().enumerate() {
                         let n: usize = word.len();
-                        if (line.char_indices().last().unwrap().0 < k + n) && (&&line[k..k + n] == word) {
+                        if (line.char_indices().last().unwrap().0 < k + n)
+                            && (&&line[k..k + n] == word)
+                        {
                             line.replace_range(k..k + 1, DIGITS[i]);
                             break;
                         }
