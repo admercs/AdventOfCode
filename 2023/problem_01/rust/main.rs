@@ -193,6 +193,14 @@ fn is_utf8_byte(byte: u8) -> bool {
     return if byte > 47 && byte < 58 { true } else { false };
 }
 
+fn concat_u8_pair(left: u8, right: u8) -> u8 {
+    return (left * 10) + right;
+}
+
+fn concat_u32_array(ints: &[u32]) -> u32 {
+    return ints.iter().enumerate().map(|(i,x)|x*(u32::pow(10, (ints.len()-i) as u32))).sum();
+}
+
 /*
  * Read lines from a file path. Output is wrapped in a Result to allow matching on errors.
  * Returns an Iterator to the Reader of the lines of the file.
