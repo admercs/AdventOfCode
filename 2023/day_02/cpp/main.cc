@@ -1,6 +1,6 @@
 /// main.cc
 ///
-/// Advent of Code 2023, December 1: Trebuchet, Part 1&2
+/// Advent of Code 2023, Day 02: Cube Conundrum
 ///
 /// Copyright © 2023 Adam Erickson, PhD
 ///
@@ -9,6 +9,7 @@
 
 #include <cinttypes>
 #include <string>
+#include <vector>
 #include <unordered_map>
 #include <filesystem>
 #include <fstream>
@@ -33,7 +34,7 @@ std::unordered_map<std::string, uint8_t> ANSICODES = {
     {"white",   37},
     {"default", 39},
 };
-
+ 
 ///
 /// Functions
 ///
@@ -81,6 +82,11 @@ void banner() {
     return;
 }
 
+// help funtion to check if argument exists.
+bool arg_exists(char* argv[], int i) {
+    return (argv[i] != NULL) ? true : false;
+}
+
 // help message.
 void help() {
     const std::string MESSAGE = R"(
@@ -96,16 +102,10 @@ Options:
 
 Examples:
   $ ./main --problem
-  $ ./main --replace iterator
+  $ ./main
     )";
-
     printf("%s\n", colorize(MESSAGE, "cyan").c_str());
     return;
-}
-
-// help funtion to check if argument exists.
-bool arg_exists(char* argv[], int i) {
-    return (argv[i] != NULL) ? true : false;
 }
 
 ///
@@ -114,10 +114,11 @@ bool arg_exists(char* argv[], int i) {
 
 int main(int argc, char* argv[]) {
 
-    // parse command-line arguments
+    // defaults
     fspath filepath = "../input.txt";
-    bool VERBOSE = false;  // default
+    bool VERBOSE = false;
 
+    // parse command-line arguments
     for (int i=1; i<argc; ++i) {
         std::string arg = argv[i];
         //printf("arg: %s\n", arg.c_str());
@@ -147,17 +148,101 @@ int main(int argc, char* argv[]) {
     // variables
     std::ifstream file = filepath;
     std::string line;
-    uint32_t answer = 0;
+    uint32_t id, r, g, b, code;
+    char c;
+    constexpr uint32_t r_max = 12;
+    constexpr uint32_t g_max = 13;
+    constexpr uint32_t b_max = 14;
+    std::string value;
+    bool possible, all_possible;
+    std::vector<bool> subgames;
+    std::vector<uint32_t> games;
+    uint32_t solution = 0;
+    size_t n, eol, i, j, k;
     
-    // get sum for each line and add it to total sum
-    uint32_t counter = 0;
+    // iterate over lines and characters in file
     if (file.is_open()) {
         while (std::getline(file, line)) {
-            counter++;
-            // do
+            (VERBOSE) && printf("\n%s\n", line.c_str());
+            r = 0;
+            g = 0;
+            b = 0;
+            possible = false;
+            all_possible = true;
+            subgames.clear();
+            n = line.length();
+            eol = n + 1;
+            i = 5;  // begin at first digit
+            while (i < eol) {
+                if (i == n) {
+                    if (r <= r_max && g <= g_max && b <= b_max) {
+                        possible = true;
+                    } else {
+                        possible = false;
+                    }
+                    (VERBOSE) && printf("Game: %3d, Subgame:  %s\n", id, possible ? "true" : "false");
+                    subgames.push_back(possible);
+                    for (j=0; j<subgames.size(); ++j) {
+                        if (subgames[j] == false) {
+                            all_possible = false;
+                        }
+                    }
+                    (VERBOSE) && printf("Game: %3d, Possible: %s\n", id, all_possible ? "true" : "false");
+                    if (all_possible) {
+                        games.push_back(id);
+                    }
+                    i++;
+                    continue;
+                }
+                c = line[i];
+                code = uint32_t(c);
+                if (code == 0 || code == 32 || code == 44) {  // null, space, or comma
+                    i++;
+                } else if (code == 58) {  // colon
+                    id = std::stoi(value);
+                    value = "";
+                    i += 2;
+                } else if (code == 59) {  // semicolon
+                    if (r <= r_max && g <= g_max && b <= b_max) {
+                        possible = true;
+                    } else {
+                        possible = false;
+                    }
+                    (VERBOSE) && printf("Game: %3d, Subgame:  %s\n", id, possible ? "true" : "false");
+                    subgames.push_back(possible);
+                    r = 0;
+                    g = 0;
+                    b = 0;
+                    i += 2;
+                } else if (std::isdigit(c)) {
+                    value += c;
+                    i++;
+                } else if (line.substr(i,3) == "red") {
+                    r = std::stoi(value);
+                    value = "";
+                    i += 3;
+                } else if (line.substr(i,5) == "green") {
+                    g = std::stoi(value);
+                    value = "";
+                    i += 5;
+                } else if (line.substr(i,4) == "blue") {
+                    b = std::stoi(value);
+                    value = "";
+                    i += 4;
+                } else {
+                    (VERBOSE) && printf("skip: %c\n", c);
+                }
+            }
         }
         file.close();
     }
-    printf("%d\n", answer);
+    // sum all possible games
+    (VERBOSE) && printf("\nPossible: ");
+    for (k=0; k<games.size(); ++k) {
+        solution += games[k];
+        (VERBOSE) && printf("%d ", games[k]);
+    }
+    (VERBOSE) && printf("\n");
+    printf("%d\n", solution);
     return 0;
 }
