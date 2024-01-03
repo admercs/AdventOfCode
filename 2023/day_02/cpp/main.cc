@@ -90,7 +90,7 @@ bool arg_exists(char* argv[], int i) {
 // help message.
 void help() {
     const std::string MESSAGE = R"(
-Usage: main[EXE] [OPTIONS] [--input <PATH>] [--replace <NAME>] [--verbose] [--problem] [--help]
+Usage: main[EXE] [OPTIONS] [--input <PATH>] [--fewest <NAME>] [--verbose] [--problem] [--help]
 
 Return the solution to Advent of Code 2023-12-01: Trebuchet.
 
