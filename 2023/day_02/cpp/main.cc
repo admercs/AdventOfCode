@@ -96,6 +96,7 @@ Return the solution to Advent of Code 2023-12-01: Trebuchet.
 
 Options:
   -i, --input <PATH>    Path to the input file. [default: '.\']
+  -f, --fewest          Enable the fewest cubes necessary.
   -v, --verbose         Enable verbose message output.
   -p, --problem         Print problem statement.
   -h, --help            Print this help message and exit.
@@ -117,6 +118,7 @@ int main(int argc, char* argv[]) {
     // defaults
     fspath filepath = "../input.txt";
     bool VERBOSE = false;
+    bool FEWEST = false;
 
     // parse command-line arguments
     for (int i=1; i<argc; ++i) {
@@ -130,6 +132,8 @@ int main(int argc, char* argv[]) {
                 printf("Argument not found: filepath\n");
                 return 1;
             }
+        } else if (arg == "--fewest" || arg == "-f") {
+            FEWEST = true;
         } else if (arg == "--verbose" || arg == "-v") {
             VERBOSE = true;
         } else if (arg == "--problem" || arg == "-p") {
@@ -150,15 +154,19 @@ int main(int argc, char* argv[]) {
     std::string line;
     uint32_t id, r, g, b, code;
     char c;
-    constexpr uint32_t r_max = 12;
-    constexpr uint32_t g_max = 13;
-    constexpr uint32_t b_max = 14;
     std::string value;
     bool possible, all_possible;
     std::vector<bool> subgames;
     std::vector<uint32_t> games;
-    uint32_t solution = 0;
     size_t n, eol, i, j, k;
+    constexpr uint32_t r_max = 12;
+    constexpr uint32_t g_max = 13;
+    constexpr uint32_t b_max = 14;
+    uint32_t solution = 0;
+    // fewest
+    std::vector<uint32_t> reds, greens, blues, game_powers;
+    uint32_t game_rmin, game_gmin, game_bmin, game_power;
+    size_t idx;
     
     // iterate over lines and characters in file
     if (file.is_open()) {
@@ -173,26 +181,50 @@ int main(int argc, char* argv[]) {
             n = line.length();
             eol = n + 1;
             i = 5;  // begin at first digit
+            if (FEWEST) {
+                reds.clear();
+                greens.clear();
+                blues.clear();
+                game_rmin = 0;
+                game_gmin = 0;
+                game_bmin = 0;
+                game_power = 0;
+            }
             while (i < eol) {
                 if (i == n) {
-                    if (r <= r_max && g <= g_max && b <= b_max) {
-                        possible = true;
-                    } else {
-                        possible = false;
-                    }
-                    (VERBOSE) && printf("Game: %3d, Subgame:  %s\n", id, possible ? "true" : "false");
-                    subgames.push_back(possible);
-                    for (j=0; j<subgames.size(); ++j) {
-                        if (subgames[j] == false) {
-                            all_possible = false;
+                    if (FEWEST) {
+                        for (idx=0; idx<reds.size(); ++idx) {
+                            game_rmin = reds[idx] > game_rmin ? reds[idx] : game_rmin; 
                         }
+                        for (idx=0; idx<greens.size(); ++idx) {
+                            game_gmin = greens[idx] > game_gmin ? greens[idx] : game_gmin; 
+                        }
+                        for (idx=0; idx<blues.size(); ++idx) {
+                            game_bmin = blues[idx] > game_bmin ? blues[idx] : game_bmin; 
+                        }
+                        game_power = game_rmin * game_gmin * game_bmin;
+                        game_powers.push_back(game_power);
+                        (VERBOSE) && printf("Game: %3d, Power: %2d\n", id, game_power);
+                    } else {
+                        if (r <= r_max && g <= g_max && b <= b_max) {
+                            possible = true;
+                        } else {
+                            possible = false;
+                        }
+                        (VERBOSE) && printf("Game: %3d, Subgame:  %s\n", id, possible ? "true" : "false");
+                        subgames.push_back(possible);
+                        for (j=0; j<subgames.size(); ++j) {
+                            if (subgames[j] == false) {
+                                all_possible = false;
+                            }
+                        }
+                        (VERBOSE) && printf("Game: %3d, Possible: %s\n", id, all_possible ? "true" : "false");
+                        if (all_possible) {
+                            games.push_back(id);
+                        }
+                        i++;
+                        continue;
                     }
-                    (VERBOSE) && printf("Game: %3d, Possible: %s\n", id, all_possible ? "true" : "false");
-                    if (all_possible) {
-                        games.push_back(id);
-                    }
-                    i++;
-                    continue;
                 }
                 c = line[i];
                 code = uint32_t(c);
@@ -203,30 +235,35 @@ int main(int argc, char* argv[]) {
                     value = "";
                     i += 2;
                 } else if (code == 59) {  // semicolon
-                    if (r <= r_max && g <= g_max && b <= b_max) {
-                        possible = true;
-                    } else {
-                        possible = false;
+                    if (!FEWEST) {
+                        if (r <= r_max && g <= g_max && b <= b_max) {
+                            possible = true;
+                        } else {
+                            possible = false;
+                        }
+                        (VERBOSE) && printf("Game: %3d, Subgame:  %s\n", id, possible ? "true" : "false");
+                        subgames.push_back(possible);
+                        r = 0;
+                        g = 0;
+                        b = 0;
                     }
-                    (VERBOSE) && printf("Game: %3d, Subgame:  %s\n", id, possible ? "true" : "false");
-                    subgames.push_back(possible);
-                    r = 0;
-                    g = 0;
-                    b = 0;
                     i += 2;
                 } else if (std::isdigit(c)) {
                     value += c;
                     i++;
                 } else if (line.substr(i,3) == "red") {
                     r = std::stoi(value);
+                    if (FEWEST) { reds.push_back(r); }
                     value = "";
                     i += 3;
                 } else if (line.substr(i,5) == "green") {
                     g = std::stoi(value);
+                    if (FEWEST) { greens.push_back(g); }
                     value = "";
                     i += 5;
                 } else if (line.substr(i,4) == "blue") {
                     b = std::stoi(value);
+                    if (FEWEST) { blues.push_back(b); }
                     value = "";
                     i += 4;
                 } else {
@@ -236,11 +273,20 @@ int main(int argc, char* argv[]) {
         }
         file.close();
     }
-    // sum all possible games
-    (VERBOSE) && printf("\nPossible: ");
-    for (k=0; k<games.size(); ++k) {
-        solution += games[k];
-        (VERBOSE) && printf("%d ", games[k]);
+    if (FEWEST) {
+        // sum products of minimum necessary cubes
+        (VERBOSE) && printf("\nPowers: ");
+        for (k=0; k<game_powers.size(); ++k) {
+            solution += game_powers[k];
+            (VERBOSE) && printf("%d ", game_powers[k]);
+        }
+    } else {
+        // sum all possible games
+        (VERBOSE) && printf("\nPossible: ");
+        for (k=0; k<games.size(); ++k) {
+            solution += games[k];
+            (VERBOSE) && printf("%d ", games[k]);
+        }
     }
     (VERBOSE) && printf("\n");
     printf("%d\n", solution);
