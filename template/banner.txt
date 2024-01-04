@@ -1,2 +1,2 @@
     Advent of Code 2023
-    Day 03:
+    Day 0x:
