@@ -15,7 +15,7 @@ Copyright 2023 Adam Erickson, PhD
 using Core, Base, Printf
 
 include("Utilities.jl")
-using .Utilities: colorize, printfile
+using .SimpleArgParse: colorize, printfile
 
 include("SimpleArgParse.jl")
 using .SimpleArgParse: ArgumentParser, add_argument, parse_args, exists, get, set
@@ -25,7 +25,7 @@ using .SimpleArgParse: ArgumentParser, add_argument, parse_args, exists, get, se
 ###
 
 ###
-### Functions
+### Variables
 ###
 
 banner()::Nothing  = printfile(joinpath("..", "banner.txt"))
